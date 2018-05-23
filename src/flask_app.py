@@ -50,13 +50,16 @@ def tab_baseline():
 @app.route('/msr/generate-tasks', methods=['POST'])
 def generate_tasks():
     job_id = int(request.args.get('jobId'))
-    # TO DO !!!
-    if not request.is_json:
-        return abort(400)
+    # TO DO: check if json is valid
+    # if not request.is_json:
+    #     return abort(400)
     content = request.get_json()
     stop_score = content['stopScore']
     out_threshold = content['outThreshold']
     filters_data = content['criteria']
     fib = FilterAssignment(db, job_id, stop_score, out_threshold, filters_data)
-    filters_assigned, items_tolabel = fib.assign_filters()
-    pass
+    if fib.assign_filters() == "filters_assigned":
+        response = {"message": "filters_assigned"}
+    else:
+        response = {"message": "error"}
+    return jsonify(response)

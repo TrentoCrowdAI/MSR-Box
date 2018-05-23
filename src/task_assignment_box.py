@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import operator
 from scipy.special import binom
 
@@ -90,4 +91,30 @@ class FilterAssignment:
                 filters_assigned.append(filter_)
                 items_new.append(item_id)
 
-        return filters_assigned, items_new
+        if self._insert_items_filters(filters_assigned, items_new):
+            return "filters_assigned"
+        return 'Error'
+
+    def _insert_items_filters(self, filters, items):
+        sql_step_old = "select max(step) from backlog where job_id = {job_id};".format(job_id=self.job_id)
+        step_old = pd.read_sql(sql_step_old, self.db.con)['max'].values[0]
+        if step_old == None:
+            step = 0
+        else:
+            step = step_old + 1
+
+        # create a list of tuples for inserting to the DB
+        # [(job_id, item_id, criterion_id, step),..]
+        data_to_insert = zip([self.job_id]*len(items), items, filters, [step]*len(items))
+        trans = self.db.con.begin()
+        try:
+            for data_row in data_to_insert:
+                sql_insert_data_row = '''
+                insert into backlog (job_id, item_id, criterion_id, step)
+                values {}
+                '''.format(data_row)
+                self.db.con.execute(sql_insert_data_row)
+        except:
+            trans.rollback()
+            return False
+        return True
