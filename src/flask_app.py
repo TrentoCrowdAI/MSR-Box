@@ -58,5 +58,5 @@ def generate_tasks():
     out_threshold = content['outThreshold']
     filters_data = content['criteria']
     fib = FilterAssignment(db, job_id, stop_score, out_threshold, filters_data)
-    fib.assign_filters()
+    filters_assigned, items_tolabel = fib.assign_filters()
     pass

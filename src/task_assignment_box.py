@@ -1,3 +1,8 @@
+import numpy as np
+import operator
+from scipy.special import binom
+
+
 class TaskAssignmentBaseline:
 
     def __init__(self, db, job_id, worker_id, max_items):
@@ -36,5 +41,53 @@ class FilterAssignment:
 
     def assign_filters(self):
         items_votes_data = self.db.get_items_tolabel_msr(self.job_id)
-        tems_tolabel_ids = items_votes_data['id'].unique()
-        return None
+        items_tolabel_ids = items_votes_data['id'].unique()
+
+        filters_assigned = []
+        items_new = []
+        for item_id in items_tolabel_ids:
+            classify_score = {}
+            n_min = {}
+
+            # initialize joint probability of getting N min OUT votes
+            joint_prob_votes_neg = {}
+            for filter_id in self.filter_list:
+                joint_prob_votes_neg[filter_id] = 1.
+                filter_acc = self.filters_params_dict[str(filter_id)]['accuracy']
+                filter_select = self.filters_params_dict[str(filter_id)]['selectivity']
+                prob_item_neg = filter_select
+
+                pos_c, neg_c = items_votes_data.loc[(items_votes_data['id'] == item_id) &
+                                                    (items_votes_data['criteria_id'] == filter_id)][
+                                                    ['in_votes', 'out_votes']].values[0]
+
+                # estimate N min votes needed to exclude the item by a filter filter_id
+                for n in range(1, 11):
+                    # new value is negative
+                    prob_vote_neg = filter_acc * prob_item_neg + (1 - filter_acc) * (1 - prob_item_neg)
+                    joint_prob_votes_neg[filter_id] *= prob_vote_neg
+                    term_neg = binom(pos_c + neg_c + n, neg_c + n) * filter_acc ** (neg_c + n) \
+                               * (1 - filter_acc) ** pos_c * filter_select
+                    term_pos = binom(pos_c + neg_c + n, pos_c) * filter_acc ** pos_c \
+                               * (1 - filter_acc) ** (neg_c + n) * (1 - filter_select)
+                    prob_item_pos = term_pos * prob_vote_neg / (term_neg + term_pos)
+                    prob_item_neg = 1 - prob_item_pos
+                    if prob_item_neg >= self.out_threshold:
+                        classify_score[filter_id] = joint_prob_votes_neg[filter_id] / n
+                        n_min[filter_id] = n
+                        break
+                    elif n == 10:
+                        classify_score[filter_id] = joint_prob_votes_neg[filter_id] / n
+                        n_min[filter_id] = n
+
+            # find most promising filter to exclude the item
+            filter_ = max(classify_score.items(), key=operator.itemgetter(1))[0]
+            n_min_val = n_min[filter_]
+            joint_prob = joint_prob_votes_neg[filter_]
+
+            # check if it is needed to do stop collect votes on the item (to mark it as IN-item)
+            if n_min_val / joint_prob < self.stop_score:
+                filters_assigned.append(filter_)
+                items_new.append(item_id)
+
+        return filters_assigned, items_new
