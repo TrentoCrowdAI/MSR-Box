@@ -20,3 +20,21 @@ class TaskAssignmentBaseline:
                 return items_tolabel, [filter_id]
                 
         return None, None
+
+
+class FilterAssignment:
+
+    def __init__(self, db, job_id, stop_score, out_threshold, filters_data):
+        # here 'criteria' == 'filter'
+        self.db = db
+        self.job_id = job_id
+        self.stop_score = stop_score
+        self.out_threshold = out_threshold
+        self.filters_params_dict = filters_data
+        self.filter_list = self.db.get_filters(self.job_id)
+        self.filters_num = len(self.filter_list)
+
+    def assign_filters(self):
+        items_votes_data = self.db.get_items_tolabel_msr(self.job_id)
+        tems_tolabel_ids = items_votes_data['id'].unique()
+        return None

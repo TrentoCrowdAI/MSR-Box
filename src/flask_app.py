@@ -2,8 +2,10 @@ import os
 from flask import Flask
 from flask import request
 from flask import jsonify
+from flask import abort
 
 from src.task_assignment_box import TaskAssignmentBaseline
+from src.task_assignment_box import FilterAssignment
 from src.db import Database
 
 # DB constants
@@ -43,3 +45,18 @@ def tab_baseline():
         }
 
     return jsonify(response)
+
+
+@app.route('/msr/generate-tasks', methods=['POST'])
+def generate_tasks():
+    job_id = int(request.args.get('jobId'))
+    # TO DO !!!
+    if not request.is_json:
+        return abort(400)
+    content = request.get_json()
+    stop_score = content['stopScore']
+    out_threshold = content['outThreshold']
+    filters_data = content['criteria']
+    fib = FilterAssignment(db, job_id, stop_score, out_threshold, filters_data)
+    fib.assign_filters()
+    pass

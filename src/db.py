@@ -88,3 +88,28 @@ class Database:
         votes_count = pd.read_sql(sql_votes, self.con)['count'].values[0]
         return votes_count
 
+    def get_items_tolabel_msr(self, job_id):
+        '''
+        :param job_id:
+        :return:
+        '''
+        # query for the project_id
+        sql_project_id = "select project_id from job where id = {};".format(job_id)
+        project_id = pd.read_sql(sql_project_id, self.con)[['project_id']].values[0][0]
+
+        # query for getting unclassified items and their votes
+        sql_items_votes = '''
+            select i.id, 
+                c.id as criteria_id, 
+                compute_item_in_out_votes({job_id}, i.id, c.id, 'yes') as in_votes,
+                compute_item_in_out_votes({job_id}, i.id, c.id, 'no') as out_votes
+            from item i join criterion c on i.project_id = c.project_id
+            where i.project_id = {project_id}
+                and i.id not in (
+                    select id from result where job_id = 18	
+                );
+            '''.format(job_id=job_id, project_id=project_id)
+        items_votes_data = pd.read_sql(sql_items_votes, self.con)
+
+        return items_votes_data
+
