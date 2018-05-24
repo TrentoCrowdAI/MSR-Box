@@ -1,4 +1,3 @@
-import numpy as np
 import pandas as pd
 import operator
 from scipy.special import binom
@@ -38,7 +37,6 @@ class FilterAssignment:
         self.out_threshold = out_threshold
         self.filters_params_dict = filters_data
         self.filter_list = self.db.get_filters(self.job_id)
-        self.filters_num = len(self.filter_list)
 
     def assign_filters(self):
         items_votes_data = self.db.get_items_tolabel_msr(self.job_id)
@@ -106,14 +104,16 @@ class FilterAssignment:
         # create a list of tuples for inserting to the DB
         # [(job_id, item_id, criterion_id, step),..]
         data_to_insert = zip([self.job_id]*len(items), items, filters, [step]*len(items))
-        trans = self.db.con.begin()
+        connection = self.db.con.connect()
+        trans = connection.begin()
         try:
             for data_row in data_to_insert:
                 sql_insert_data_row = '''
                 insert into backlog (job_id, item_id, criterion_id, step)
                 values {}
                 '''.format(data_row)
-                self.db.con.execute(sql_insert_data_row)
+                connection.execute(sql_insert_data_row)
+            trans.commit()
         except:
             trans.rollback()
             return False
