@@ -4,8 +4,9 @@ from flask import request
 from flask import jsonify
 from flask import abort
 
-from src.task_assignment_box import TaskAssignmentBaseline
-from src.task_assignment_box import FilterAssignment
+# from src.msr_box import TaskAssignmentMSR
+from src.msr_box import FilterAssignment
+from src.msr_box import FilterParameters
 from src.db import Database
 
 # DB constants
@@ -19,32 +20,6 @@ PORT = os.getenv('PGPORT') or 5432
 db = Database(USER, PASSWORD, DB, HOST, PORT)
 
 app = Flask(__name__)
-
-
-@app.route('/next-task', methods=['GET'])
-def tab_baseline():
-    job_id = int(request.args.get('jobId'))
-    worker_id = int(request.args.get('workerId'))
-    max_items = int(request.args.get('maxItems'))
-
-    # task assignment baseline
-    tab = TaskAssignmentBaseline(db, job_id, worker_id, max_items)
-    items, criteria = tab.get_tasks()
-
-    # check if job is finished
-    # items == None -> job finished
-    # items == [] -> no items to a given worker
-    if items != None:
-        response = {
-            'items': items,
-            'criteria': criteria
-        }
-    else:
-        response = {
-            'done': True
-        }
-
-    return jsonify(response)
 
 
 @app.route('/msr/generate-tasks', methods=['POST'])
@@ -63,3 +38,39 @@ def generate_tasks():
         return jsonify(response)
     else:
         abort(500, {"message": "error"})
+
+#
+# @app.route('/msr/next-task', methods=['GET'])
+# def tab_baseline():
+#     job_id = int(request.args.get('jobId'))
+#     worker_id = int(request.args.get('workerId'))
+#     max_items = int(request.args.get('maxItems'))
+#
+#     # task assignment baseline
+#     tab = TaskAssignmentMSR(db, job_id, worker_id, max_items)
+#     items, criteria = tab.get_tasks()
+#
+#     # check if job is finished
+#     # items == None -> job finished
+#     # items == [] -> no items to a given worker
+#     if items != None:
+#         response = {
+#             'items': items,
+#             'criteria': criteria
+#         }
+#     else:
+#         response = {
+#             'done': True
+#         }
+#
+#     return jsonify(response)
+
+
+@app.route('/msr/update-filter-params', methods=['GET'])
+def update_filter_params():
+    job_id = int(request.args.get('jobId'))
+    fp = FilterParameters(db, job_id)
+    filter_select_new = fp.update_filter_params()
+
+    response = {"selectivity": filter_select_new}
+    return jsonify(response)
