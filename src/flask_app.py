@@ -52,7 +52,7 @@ def generate_tasks():
     job_id = int(request.args.get('jobId'))
     # TO DO: check if json is valid
     # if not request.is_json:
-    #     return abort(400)
+    #     abort(400)
     content = request.get_json()
     stop_score = content['stopScore']
     out_threshold = content['outThreshold']
@@ -60,6 +60,6 @@ def generate_tasks():
     fib = FilterAssignment(db, job_id, stop_score, out_threshold, filters_data)
     if fib.assign_filters() == "filters_assigned":
         response = {"message": "filters_assigned"}
+        return jsonify(response)
     else:
-        response = {"message": "error"}
-    return jsonify(response)
+        abort(500, {"message": "error"})
