@@ -69,7 +69,11 @@ class FilterAssignment:
 
         filters_assigned = []
         items_new = []
+        items_stopped = []
         for item_id in items_tolabel_ids:
+            item_data = {
+                'criteria': []
+                }
             classify_score = {}
             n_min = {}
 
@@ -85,6 +89,10 @@ class FilterAssignment:
                                                     (items_votes_data['criteria_id'] == filter_id)][
                                                     ['in_votes', 'out_votes']].values[0]
 
+                # add payload to item_data dict
+                item_data['criteria'].append(self.__compute_item_filter_data(pos_c,
+                                             neg_c, filter_acc, filter_select, filter_id))
+
                 # estimate N min votes needed to exclude the item by a filter filter_id
                 for n in range(1, 11):
                     # new value is negative
@@ -94,8 +102,8 @@ class FilterAssignment:
                                * (1 - filter_acc) ** pos_c * filter_select
                     term_pos = binom(pos_c + neg_c + n, pos_c) * filter_acc ** pos_c \
                                * (1 - filter_acc) ** (neg_c + n) * (1 - filter_select)
-                    prob_item_pos = term_pos * prob_vote_neg / (term_neg + term_pos)
-                    prob_item_neg = 1 - prob_item_pos
+                    prob_item_neg = term_neg / (term_neg + term_pos)
+
                     if prob_item_neg >= self.out_threshold:
                         classify_score[filter_id] = joint_prob_votes_neg[filter_id] / n
                         n_min[filter_id] = n
@@ -113,12 +121,33 @@ class FilterAssignment:
             if n_min_val / joint_prob < self.stop_score:
                 filters_assigned.append(filter_)
                 items_new.append(item_id)
+            else:
+                # mark the item as classified
+                item_data['outcome'] = 'STOPPED'
+                items_stopped.append((self.job_id, item_id, item_data))
 
-        if self._insert_items_filters(filters_assigned, items_new):
+        # TODO: implement __insert_items_stopped method
+        if self.__insert_items_filters(filters_assigned, items_new):
             return "filters_assigned"
         return 'Error'
 
-    def _insert_items_filters(self, filters, items):
+    def __compute_item_filter_data(self, pos_c, neg_c, filter_acc, filter_select, filter_id):
+        term_neg = binom(pos_c + neg_c, neg_c) * filter_acc ** (neg_c) \
+                   * (1 - filter_acc) ** pos_c * filter_select
+        term_pos = binom(pos_c + neg_c, pos_c) * filter_acc ** pos_c \
+                   * (1 - filter_acc) ** (neg_c) * (1 - filter_select)
+        prob_item_filter_neg = term_pos / (term_neg + term_pos)
+
+        item_filter_data = {
+                    'id': filter_id,
+                    'pout': prob_item_filter_neg,
+                    'in': pos_c,
+                    'out': neg_c
+                }
+
+        return item_filter_data
+
+    def __insert_items_filters(self, filters, items):
         sql_step_old = "select max(step) from backlog where job_id = {job_id};".format(job_id=self.job_id)
         step_old = pd.read_sql(sql_step_old, self.db.con)['max'].values[0]
         if step_old == None:
