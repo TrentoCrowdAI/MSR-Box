@@ -4,7 +4,7 @@ from flask import request
 from flask import jsonify
 from flask import abort
 
-# from src.msr_box import TaskAssignmentMSR
+from src.msr_box import TaskAssignmentMSR
 from src.msr_box import FilterAssignment
 from src.msr_box import FilterParameters
 from src.db import Database
@@ -39,31 +39,31 @@ def generate_tasks():
     else:
         abort(500, {"message": "error"})
 
-#
-# @app.route('/msr/next-task', methods=['GET'])
-# def tab_baseline():
-#     job_id = int(request.args.get('jobId'))
-#     worker_id = int(request.args.get('workerId'))
-#     max_items = int(request.args.get('maxItems'))
-#
-#     # task assignment baseline
-#     tab = TaskAssignmentMSR(db, job_id, worker_id, max_items)
-#     items, criteria = tab.get_tasks()
-#
-#     # check if job is finished
-#     # items == None -> job finished
-#     # items == [] -> no items to a given worker
-#     if items != None:
-#         response = {
-#             'items': items,
-#             'criteria': criteria
-#         }
-#     else:
-#         response = {
-#             'done': True
-#         }
-#
-#     return jsonify(response)
+
+@app.route('/msr/next-task', methods=['GET'])
+def tab_msr():
+    job_id = int(request.args.get('jobId'))
+    worker_id = int(request.args.get('workerId'))
+    max_items = int(request.args.get('maxItems'))
+
+    # task assignment baseline
+    tab_msr = TaskAssignmentMSR(db, job_id, worker_id, max_items)
+    items, filters = tab_msr.get_tasks()
+
+    # check if job is finished
+    # items == None -> job finished
+    # items == [] -> no items to a given worker
+    if items != None:
+        response = {
+            'items': items,
+            'criteria': filters
+        }
+    else:
+        response = {
+            'done': True
+        }
+
+    return jsonify(response)
 
 
 @app.route('/msr/update-filter-params', methods=['GET'])

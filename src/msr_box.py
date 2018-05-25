@@ -1,30 +1,55 @@
 import pandas as pd
+import numpy as np
 import operator
 from scipy.special import binom
 
 
-# class TaskAssignmentMSR:
-#
-#     def __init__(self, db, job_id, worker_id, max_items):
-#         self.db = db
-#         self.job_id = job_id
-#         self.worker_id = worker_id
-#         self.max_items = max_items
-#
-#     def get_tasks(self):
-#         filter_list = self.db.get_filters(self.job_id)
-#         for filter_id in filter_list:
-#             items_tolabel = self.db.get_items_tolabel(filter_id, self.worker_id, self.job_id)
-#             items_tolabel_num = len(items_tolabel)
-#
-#             if items_tolabel_num == 0:
-#                 continue
-#             if items_tolabel_num >= self.max_items:
-#                 return items_tolabel[:self.max_items], [filter_id]
-#             else:
-#                 return items_tolabel, [filter_id]
-#
-#         return None, None
+class TaskAssignmentMSR:
+
+    def __init__(self, db, job_id, worker_id, max_items):
+        self.db = db
+        self.job_id = job_id
+        self.worker_id = worker_id
+        self.max_items = max_items
+
+    def get_tasks(self):
+        sql_filter_list = '''
+            select distinct(b.criterion_id) 
+            from backlog b 
+            where b.job_id = {job_id}
+            and b.step = (
+                select max(step) from backlog where job_id = {job_id}
+            );'''.format(job_id=self.job_id)
+        filter_list = pd.read_sql(sql_filter_list, self.db.con)['criterion_id'].values
+
+        # randomize the order of filters available
+        np.random.shuffle(filter_list)
+        filter_list = [int(i) for i in filter_list]
+        for filter_id in filter_list:
+            sql_items_tolabel = '''
+                select b.item_id 
+                from backlog b 
+                where b.job_id = {job_id}
+                and b.criterion_id = {filter_id}
+                and b.step = (
+                    select max(step) from backlog where job_id = {job_id}
+                )
+                and compute_item_entries(b.job_id, b.item_id, b.criterion_id)
+                 < (select max(step)+1 from backlog where job_id = {job_id})
+            '''.format(job_id=self.job_id, filter_id=filter_id)
+
+            items_tolabel = pd.read_sql(sql_items_tolabel, self.db.con)['item_id'].values
+            items_tolabel = [int(i) for i in items_tolabel]
+            items_tolabel_num = len(items_tolabel)
+
+            if items_tolabel_num == 0:
+                continue
+            if items_tolabel_num >= self.max_items:
+                return items_tolabel[:self.max_items], [filter_id]
+            else:
+                return items_tolabel, [filter_id]
+
+        return None, None
 
 
 class FilterAssignment:
