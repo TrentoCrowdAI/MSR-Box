@@ -3,6 +3,8 @@ import numpy as np
 import operator
 from scipy.special import binom
 
+from flask import jsonify
+
 
 class TaskAssignmentMSR:
 
@@ -69,7 +71,7 @@ class FilterAssignment:
 
         filters_assigned = []
         items_new = []
-        items_stopped = []
+        items_stopped = {}
         for item_id in items_tolabel_ids:
             item_data = {
                 'criteria': []
@@ -124,10 +126,10 @@ class FilterAssignment:
             else:
                 # mark the item as classified
                 item_data['outcome'] = 'STOPPED'
-                items_stopped.append((self.job_id, item_id, item_data))
+                items_stopped[item_id] = item_data
 
-        # TODO: implement __insert_items_stopped method
-        if self.__insert_items_filters(filters_assigned, items_new):
+        if self.__insert_items_filters(filters_assigned, items_new) and \
+                self.__insert_items_filters_stopped(items_stopped):
             return "filters_assigned"
         return 'Error'
 
@@ -166,6 +168,23 @@ class FilterAssignment:
                 insert into backlog (job_id, item_id, criterion_id, step)
                 values {}
                 '''.format(data_row)
+                connection.execute(sql_insert_data_row)
+            trans.commit()
+        except:
+            trans.rollback()
+            return False
+        return True
+
+    def __insert_items_filters_stopped(self, items_stopped):
+        connection = self.db.con.connect()
+        trans = connection.begin()
+        try:
+            for item_id in items_stopped.keys():
+                data_json = pd.Series(items_stopped[item_id]).to_json()
+                sql_insert_data_row = '''
+                insert into result (job_id, item_id, created_at, data)
+                values({job_id}, {item_id}, now(), '{data_json}')
+                '''.format(job_id=self.job_id, item_id=item_id, data_json=data_json)
                 connection.execute(sql_insert_data_row)
             trans.commit()
         except:
