@@ -24,11 +24,11 @@ app = Flask(__name__)
 
 @app.route('/msr/generate-tasks', methods=['POST'])
 def generate_tasks():
-    job_id = int(request.args.get('jobId'))
     # TO DO: check if json is valid
     # if not request.is_json:
     #     abort(400)
     content = request.get_json()
+    job_id = int(content['jobId'])
     stop_score = content['stopScore']
     out_threshold = content['outThreshold']
     filters_data = content['criteria']
@@ -66,9 +66,8 @@ def tab_msr():
     return jsonify(response)
 
 
-@app.route('/msr/update-filter-params', methods=['GET'])
-def update_filter_params():
-    job_id = int(request.args.get('jobId'))
+@app.route('/msr/update-filter-params/<int:job_id>', methods=['PUT'])
+def update_filter_params(job_id):
     fp = FilterParameters(db, job_id)
     filter_select_new = fp.update_filter_params()
 
