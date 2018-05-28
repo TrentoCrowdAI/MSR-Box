@@ -5,6 +5,7 @@ from flask import jsonify
 from flask import abort
 
 from src.msr_box import TaskAssignmentMSR
+from src.msr_box import ClassificationMSR
 from src.msr_box import FilterAssignment
 from src.msr_box import FilterParameters
 from src.db import Database
@@ -75,3 +76,18 @@ def update_filter_params(job_id):
     filter_select_new = fp.update_filter_params()
 
     return jsonify(filter_select_new)
+
+
+@app.route('/msr/classify/<int:job_id>', methods=['POST'])
+def classify(job_id):
+    content = request.get_json()
+    filters_data = content['criteria']
+    out_threshold = content['outThreshold']
+    in_threshold = content['inThreshold']
+
+    cl_msr = ClassificationMSR(db, job_id, filters_data, out_threshold, in_threshold)
+    if cl_msr.classify() == "classified":
+        response = {"message": "classified"}
+        return jsonify(response)
+    else:
+        abort(500, {"message": "error"})
