@@ -91,7 +91,7 @@ class Database:
     def get_items_tolabel_msr(self, job_id):
         '''
         :param job_id:
-        :return:
+        :return: items_votes_data
         '''
         # query for the project_id
         sql_project_id = "select project_id from job where id = {};".format(job_id)
@@ -122,3 +122,24 @@ class Database:
         project_id = pd.read_sql(sql_project_id, self.con)['project_id'].values[0]
 
         return project_id
+
+    def get_update_filter_data(self, job_id, project_id):
+        '''
+        :param job_id:
+        :param project_id:
+        :return: item_filter_data
+        '''
+        # select all item-filter with at least one vote
+        sql_item_filter_data = '''
+                    select s.* from (select i.id, 
+                        c.id as criteria_id, 
+                        compute_item_in_out_votes({job_id}, i.id, c.id, 'yes') as in_votes,
+                        compute_item_in_out_votes({job_id}, i.id, c.id, 'no') as out_votes
+                    from item i join criterion c on i.project_id = c.project_id
+                    where i.project_id = {project_id}
+                    ) s
+                    where (s.in_votes > 0 or s.out_votes > 0);
+                    '''.format(job_id=job_id, project_id=project_id)
+        item_filter_data = pd.read_sql(sql_item_filter_data, self.con)
+
+        return item_filter_data
