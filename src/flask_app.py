@@ -68,8 +68,11 @@ def tab_msr():
 
 @app.route('/msr/update-filter-params/<int:job_id>', methods=['PUT'])
 def update_filter_params(job_id):
-    fp = FilterParameters(db, job_id)
-    filter_select_new = fp.update_filter_params()
+    content = request.get_json()
+    filters_data = content['criteria']
+
+    fp = FilterParameters(db, job_id, filters_data)
+    filter_select_new = fp.update_filter_select()
 
     response = {"selectivity": filter_select_new}
     return jsonify(response)

@@ -3,8 +3,6 @@ import numpy as np
 import operator
 from scipy.special import binom
 
-from flask import jsonify
-
 
 class TaskAssignmentMSR:
 
@@ -195,15 +193,37 @@ class FilterAssignment:
 
 class FilterParameters:
 
-    def __init__(self, db, job_id):
+    def __init__(self, db, job_id, filters_data):
         # here 'criteria' == 'filter'
         self.db = db
         self.job_id = job_id
+        self.filters_params_dict = filters_data
         self.filter_list = self.db.get_filters(self.job_id)
 
-    def update_filter_params(self):
+    def update_filter_select(self):
+        apply_filters_prob = {}
+        for filter_id in self.filter_list:
+            apply_filters_prob[filter_id] = []
+
+        # select all item-filter with at least one vote
+        item_filter_data = [(54, 41), (54, 42), (54, 43)]  # TO DO!!
+        for item_id, filter_id in item_filter_data:
+            filter_acc = self.filters_params_dict[str(filter_id)]['accuracy']
+            filter_select = self.filters_params_dict[str(filter_id)]['selectivity']
+
+            # compute prob of applying the filter filter_id on item item_id
+            pos_c, neg_c = 0, 0  # TO DO!!
+            term_neg = binom(pos_c + neg_c, neg_c) * filter_acc ** (neg_c) \
+                       * (1 - filter_acc) ** pos_c * filter_select
+            term_pos = binom(pos_c + neg_c, pos_c) * filter_acc ** pos_c \
+                       * (1 - filter_acc) ** (neg_c) * (1 - filter_select)
+            prob_item_neg = term_neg / (term_neg + term_pos)
+            # add prob_item_neg to the list of probs related to filter_id
+            apply_filters_prob[filter_id].append(prob_item_neg)
+
+        # update selectivity of filters
         filter_select_new = {}
         for filter_id in self.filter_list:
-            filter_select_new[filter_id] = 123
-            # update selectivity
+            filter_select_new[filter_id] = np.mean(apply_filters_prob[filter_id])
+
         return filter_select_new
