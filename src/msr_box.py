@@ -52,7 +52,86 @@ class TaskAssignmentMSR:
         return None, None
 
 
-class FilterAssignment:
+class ClassificationMSR:
+
+    def __init__(self, db, job_id, filters_data, out_threshold, in_threshold):
+        # here 'criteria' == 'filter'
+        self.db = db
+        self.job_id = job_id
+        self.project_id = self.db.get_project_id(self.job_id)
+        self.filters_params_dict = filters_data
+        self.filter_list = self.db.get_filters(self.job_id)
+        self.out_threshold = out_threshold
+        self.in_threshold = in_threshold
+
+    def classify(self):
+        items_classified = {}
+        items_votes_data = self.db.get_items_tolabel_msr(self.job_id)
+        items_ids = items_votes_data['id'].unique()
+        for item_id in items_ids:
+            item_data = {
+                'criteria': []
+            }
+            prob_item_pos = 1.
+            for filter_id in self.filter_list:
+                # get filter-item statistics
+                filter_acc = self.filters_params_dict[str(filter_id)]['accuracy']
+                filter_select = self.filters_params_dict[str(filter_id)]['selectivity']
+                pos_c, neg_c = items_votes_data.loc[(items_votes_data['id'] == item_id) &
+                                                    (items_votes_data['criteria_id'] == filter_id)][
+                                                    ['in_votes', 'out_votes']].values[0]
+
+                # compute prob of not applying the filter filter_id on item item_id
+                term_neg = binom(pos_c + neg_c, neg_c) * filter_acc ** (neg_c) \
+                           * (1 - filter_acc) ** pos_c * filter_select
+                term_pos = binom(pos_c + neg_c, pos_c) * filter_acc ** pos_c \
+                           * (1 - filter_acc) ** (neg_c) * (1 - filter_select)
+                prob_item_filter_pos = term_pos / (term_neg + term_pos)
+                prob_item_pos *= prob_item_filter_pos
+
+                # add payload to item_data dict
+                item_filter_data = {
+                    'id': filter_id,
+                    'pout': 1 - prob_item_filter_pos,
+                    'in': pos_c,
+                    'out': neg_c
+                }
+                item_data['criteria'].append(item_filter_data)
+
+            prob_item_neg = 1 - prob_item_pos
+            if prob_item_neg > self.out_threshold:
+                # mark the item as classified
+                item_data['outcome'] = 'OUT'
+                items_classified[item_id] = item_data
+            elif prob_item_pos > self.in_threshold:
+                # mark the item as classified
+                item_data['outcome'] = 'IN'
+                items_classified[item_id] = item_data
+
+        if self.insert_items_filters(items_classified):
+            return 'classified'
+        else:
+            return 'error'
+
+    def insert_items_filters(self, items):
+        connection = self.db.con.connect()
+        trans = connection.begin()
+        try:
+            for item_id in items.keys():
+                data_json = pd.Series(items[item_id]).to_json()
+                sql_insert_data_row = '''
+                insert into result (job_id, item_id, created_at, data)
+                values({job_id}, {item_id}, now(), '{data_json}')
+                '''.format(job_id=self.job_id, item_id=item_id, data_json=data_json)
+                connection.execute(sql_insert_data_row)
+            trans.commit()
+        except:
+            trans.rollback()
+            return False
+        return True
+
+
+class FilterAssignment(ClassificationMSR):
 
     def __init__(self, db, job_id, stop_score, out_threshold, filters_data):
         # here 'criteria' == 'filter'
@@ -126,8 +205,8 @@ class FilterAssignment:
                 item_data['outcome'] = 'STOPPED'
                 items_stopped[item_id] = item_data
 
-        if self.__insert_items_filters(filters_assigned, items_new) and \
-                self.__insert_items_filters_stopped(items_stopped):
+        if self.__insert_items_filters_backlog(filters_assigned, items_new) and \
+                super().insert_items_filters(items_stopped):
             return "filters_assigned"
         return 'Error'
 
@@ -147,7 +226,7 @@ class FilterAssignment:
 
         return item_filter_data
 
-    def __insert_items_filters(self, filters, items):
+    def __insert_items_filters_backlog(self, filters, items):
         sql_step_old = "select max(step) from backlog where job_id = {job_id};".format(job_id=self.job_id)
         step_old = pd.read_sql(sql_step_old, self.db.con)['max'].values[0]
         if step_old == None:
@@ -166,23 +245,6 @@ class FilterAssignment:
                 insert into backlog (job_id, item_id, criterion_id, step)
                 values {}
                 '''.format(data_row)
-                connection.execute(sql_insert_data_row)
-            trans.commit()
-        except:
-            trans.rollback()
-            return False
-        return True
-
-    def __insert_items_filters_stopped(self, items_stopped):
-        connection = self.db.con.connect()
-        trans = connection.begin()
-        try:
-            for item_id in items_stopped.keys():
-                data_json = pd.Series(items_stopped[item_id]).to_json()
-                sql_insert_data_row = '''
-                insert into result (job_id, item_id, created_at, data)
-                values({job_id}, {item_id}, now(), '{data_json}')
-                '''.format(job_id=self.job_id, item_id=item_id, data_json=data_json)
                 connection.execute(sql_insert_data_row)
             trans.commit()
         except:
@@ -237,82 +299,3 @@ class FilterParameters:
                     'accuracy': self.filters_params_dict[str(filter_id)]['accuracy']
                 }
         return filter_params_new
-
-
-class ClassificationMSR:
-
-    def __init__(self, db, job_id, filters_data, out_threshold, in_threshold):
-        # here 'criteria' == 'filter'
-        self.db = db
-        self.job_id = job_id
-        self.project_id = self.db.get_project_id(self.job_id)
-        self.filters_params_dict = filters_data
-        self.filter_list = self.db.get_filters(self.job_id)
-        self.out_threshold = out_threshold
-        self.in_threshold = in_threshold
-
-    def classify(self):
-        items_classified = {}
-        items_votes_data = self.db.get_items_tolabel_msr(self.job_id)
-        items_ids = items_votes_data['id'].unique()
-        for item_id in items_ids:
-            item_data = {
-                'criteria': []
-            }
-            prob_item_pos = 1.
-            for filter_id in self.filter_list:
-                # get filter-item statistics
-                filter_acc = self.filters_params_dict[str(filter_id)]['accuracy']
-                filter_select = self.filters_params_dict[str(filter_id)]['selectivity']
-                pos_c, neg_c = items_votes_data.loc[(items_votes_data['id'] == item_id) &
-                                                    (items_votes_data['criteria_id'] == filter_id)][
-                                                    ['in_votes', 'out_votes']].values[0]
-
-                # compute prob of not applying the filter filter_id on item item_id
-                term_neg = binom(pos_c + neg_c, neg_c) * filter_acc ** (neg_c) \
-                           * (1 - filter_acc) ** pos_c * filter_select
-                term_pos = binom(pos_c + neg_c, pos_c) * filter_acc ** pos_c \
-                           * (1 - filter_acc) ** (neg_c) * (1 - filter_select)
-                prob_item_filter_pos = term_pos / (term_neg + term_pos)
-                prob_item_pos *= prob_item_filter_pos
-
-                # add payload to item_data dict
-                item_filter_data = {
-                    'id': filter_id,
-                    'pout': 1 - prob_item_filter_pos,
-                    'in': pos_c,
-                    'out': neg_c
-                }
-                item_data['criteria'].append(item_filter_data)
-
-            prob_item_neg = 1 - prob_item_pos
-            if prob_item_neg > self.out_threshold:
-                # mark the item as classified
-                item_data['outcome'] = 'OUT'
-                items_classified[item_id] = item_data
-            elif prob_item_pos > self.in_threshold:
-                # mark the item as classified
-                item_data['outcome'] = 'IN'
-                items_classified[item_id] = item_data
-
-        if self.__insert_items_filters(items_classified):
-            return 'classified'
-        else:
-            return 'error'
-
-    def __insert_items_filters(self, items):
-        connection = self.db.con.connect()
-        trans = connection.begin()
-        try:
-            for item_id in items.keys():
-                data_json = pd.Series(items[item_id]).to_json()
-                sql_insert_data_row = '''
-                insert into result (job_id, item_id, created_at, data)
-                values({job_id}, {item_id}, now(), '{data_json}')
-                '''.format(job_id=self.job_id, item_id=item_id, data_json=data_json)
-                connection.execute(sql_insert_data_row)
-            trans.commit()
-        except:
-            trans.rollback()
-            return False
-        return True
