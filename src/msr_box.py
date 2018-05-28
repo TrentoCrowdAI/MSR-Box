@@ -197,6 +197,7 @@ class FilterParameters:
         # here 'criteria' == 'filter'
         self.db = db
         self.job_id = job_id
+        self.project_id = self.db.get_project_id(self.job_id)
         self.filters_params_dict = filters_data
         self.filter_list = self.db.get_filters(self.job_id)
 
@@ -206,13 +207,14 @@ class FilterParameters:
             apply_filters_prob[filter_id] = []
 
         # select all item-filter with at least one vote
-        item_filter_data = [(54, 41), (54, 42), (54, 43)]  # TO DO!!
-        for item_id, filter_id in item_filter_data:
+        item_filter_data = self.db.get_update_filter_data(self.job_id, self.project_id)
+        for _, data in item_filter_data.iterrows():
+            filter_id = data['criteria_id']
             filter_acc = self.filters_params_dict[str(filter_id)]['accuracy']
             filter_select = self.filters_params_dict[str(filter_id)]['selectivity']
 
             # compute prob of applying the filter filter_id on item item_id
-            pos_c, neg_c = 0, 0  # TO DO!!
+            pos_c, neg_c = data['in_votes'], data['out_votes']
             term_neg = binom(pos_c + neg_c, neg_c) * filter_acc ** (neg_c) \
                        * (1 - filter_acc) ** pos_c * filter_select
             term_pos = binom(pos_c + neg_c, pos_c) * filter_acc ** pos_c \
@@ -224,6 +226,9 @@ class FilterParameters:
         # update selectivity of filters
         filter_select_new = {}
         for filter_id in self.filter_list:
-            filter_select_new[filter_id] = np.mean(apply_filters_prob[filter_id])
+            if apply_filters_prob[filter_id]:
+                filter_select_new[filter_id] = np.mean(apply_filters_prob[filter_id])
+            else:
+                filter_select_new[filter_id] = self.filters_params_dict[str(filter_id)]['selectivity']
 
         return filter_select_new
