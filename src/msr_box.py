@@ -136,7 +136,7 @@ class FilterAssignment:
                    * (1 - filter_acc) ** pos_c * filter_select
         term_pos = binom(pos_c + neg_c, pos_c) * filter_acc ** pos_c \
                    * (1 - filter_acc) ** (neg_c) * (1 - filter_select)
-        prob_item_filter_neg = term_pos / (term_neg + term_pos)
+        prob_item_filter_neg = term_neg / (term_neg + term_pos)
 
         item_filter_data = {
                     'id': filter_id,
