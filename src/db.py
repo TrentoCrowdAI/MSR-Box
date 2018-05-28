@@ -105,7 +105,7 @@ class Database:
             from item i join criterion c on i.project_id = c.project_id
             where i.project_id = {project_id}
                 and i.id not in (
-                    select id from result where job_id = 18	
+                    select item_id from result where job_id = {job_id}
                 );
             '''.format(job_id=job_id, project_id=project_id)
         items_votes_data = pd.read_sql(sql_items_votes, self.con)
