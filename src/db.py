@@ -94,8 +94,7 @@ class Database:
         :return: items_votes_data
         '''
         # query for the project_id
-        sql_project_id = "select project_id from job where id = {};".format(job_id)
-        project_id = pd.read_sql(sql_project_id, self.con)[['project_id']].values[0][0]
+        project_id = self.get_project_id(job_id)
 
         # query for getting unclassified items and their votes
         sql_items_votes = '''
