@@ -201,7 +201,7 @@ class FilterParameters:
         self.filters_params_dict = filters_data
         self.filter_list = self.db.get_filters(self.job_id)
 
-    def update_filter_select(self):
+    def update_filter_params(self):
         apply_filters_prob = {}
         for filter_id in self.filter_list:
             apply_filters_prob[filter_id] = []
@@ -224,11 +224,16 @@ class FilterParameters:
             apply_filters_prob[filter_id].append(prob_item_neg)
 
         # update selectivity of filters
-        filter_select_new = {}
+        filter_params_new = {'criteria': {}}
         for filter_id in self.filter_list:
             if apply_filters_prob[filter_id]:
-                filter_select_new[filter_id] = np.mean(apply_filters_prob[filter_id])
+                filter_params_new['criteria'][filter_id] = {
+                    'selectivity': np.mean(apply_filters_prob[filter_id]),
+                    'accuracy': self.filters_params_dict[str(filter_id)]['accuracy']
+                }
             else:
-                filter_select_new[filter_id] = self.filters_params_dict[str(filter_id)]['selectivity']
-
-        return filter_select_new
+                filter_params_new['criteria'][filter_id] = {
+                    'selectivity': self.filters_params_dict[str(filter_id)]['selectivity'],
+                    'accuracy': self.filters_params_dict[str(filter_id)]['accuracy']
+                }
+        return filter_params_new

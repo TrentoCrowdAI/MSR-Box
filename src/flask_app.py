@@ -72,7 +72,6 @@ def update_filter_params(job_id):
     filters_data = content['criteria']
 
     fp = FilterParameters(db, job_id, filters_data)
-    filter_select_new = fp.update_filter_select()
+    filter_select_new = fp.update_filter_params()
 
-    response = {"selectivity": filter_select_new}
-    return jsonify(response)
+    return jsonify(filter_select_new)
