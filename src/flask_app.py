@@ -78,9 +78,10 @@ def update_filter_params(job_id):
     return jsonify(filter_select_new)
 
 
-@app.route('/msr/classify/<int:job_id>', methods=['POST'])
-def classify(job_id):
+@app.route('/msr/classify', methods=['POST'])
+def classify():
     content = request.get_json()
+    job_id = int(content['jobId'])
     filters_data = content['criteria']
     out_threshold = content['outThreshold']
     in_threshold = content['inThreshold']
