@@ -113,3 +113,12 @@ class Database:
 
         return items_votes_data
 
+    def get_project_id(self, job_id):
+        '''
+        :param job_id:
+        :return: project_id
+        '''
+        sql_project_id = "select project_id from job where id = {job_id};".format(job_id=job_id)
+        project_id = pd.read_sql(sql_project_id, self.con)['project_id'].values[0]
+
+        return project_id
