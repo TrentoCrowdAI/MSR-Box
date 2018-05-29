@@ -9,6 +9,7 @@ from src.msr_box import ClassificationMSR
 from src.msr_box import FilterAssignment
 from src.msr_box import FilterParameters
 from src.db import Database
+from src.baseround.estimation import EstimationTaskParams
 
 # DB constants
 USER = os.getenv('PGUSER') or 'postgres'
@@ -90,5 +91,48 @@ def classify():
     if cl_msr.classify() == "classified":
         response = {"message": "classified"}
         return jsonify(response)
+    else:
+        abort(500, {"message": "error"})
+
+
+@app.route('/msr/estimate-task-parameters', methods=['POST'])
+def estimate_task_parameters():
+    content = request.get_json()
+    job_id = int(content['jobId'])
+    out_threshold = content['outThreshold']
+
+    etp = EstimationTaskParams(db, job_id, out_threshold)
+    p_out_statistics_raw = []  #[[p_outs for filter1], [p_outs for filter2], ..]
+    response_payload = {'criteria': {}}
+    workers_accuracy = {}
+    filter_list = db.get_filters(job_id)
+    for filter_id in filter_list:
+        # get data for filter_id
+        data, workers_map, item_map = etp.get_thuthfinder_input(filter_id)
+        acc, p_out = etp.aggregate_data(data)
+        p_out_statistics_raw.append(p_out)
+        filter_acc, filter_select = etp.estimate_filter_params(acc, p_out)
+
+        # construct response payload
+        # estimated accuracy of workers
+        worker_acc_pair_list = [(workers_map[key], acc[key]) for key in workers_map.keys()]
+        workers_accuracy[filter_id] = []
+        for worker_acc in worker_acc_pair_list:
+            workers_accuracy[filter_id].append(dict([worker_acc]))
+
+        # estimated filter's accuracy and selectivity
+        response_payload['criteria'][filter_id] = {
+            'accuracy': filter_acc,
+            'selectivity': filter_select
+        }
+    response_payload['workersAccuracy'] = workers_accuracy
+
+    item_filter_pout = {}
+    for item_index, item_id in item_map.items():
+        item_filter_pout[item_id] = [filter_pouts[item_index]
+                                     for filter_pouts in p_out_statistics_raw]
+
+    if etp.classify(item_filter_pout) == "classified":
+        return jsonify(response_payload)
     else:
         abort(500, {"message": "error"})
