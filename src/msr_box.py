@@ -205,7 +205,7 @@ class FilterAssignment(ClassificationMSR):
                 item_data['outcome'] = 'STOPPED'
                 items_stopped[item_id] = item_data
 
-        if self.__insert_items_filters_backlog(filters_assigned, items_new) and \
+        if self.insert_items_filters_backlog(filters_assigned, items_new) and \
                 super().insert_items_filters(items_stopped):
             return "filters_assigned"
         return 'Error'
@@ -226,7 +226,7 @@ class FilterAssignment(ClassificationMSR):
 
         return item_filter_data
 
-    def __insert_items_filters_backlog(self, filters, items):
+    def insert_items_filters_backlog(self, filters, items):
         sql_step_old = "select max(step) from backlog where job_id = {job_id};".format(job_id=self.job_id)
         step_old = pd.read_sql(sql_step_old, self.db.con)['max'].values[0]
         if step_old == None:
@@ -301,7 +301,7 @@ class FilterParameters:
         return filter_params_new
 
 
-class Baseround:
+class Baseround(FilterAssignment):
 
     def __init__(self, db, job_id, size):
         self.db = db
@@ -309,4 +309,21 @@ class Baseround:
         self.size = size
 
     def generate_baseround(self):
-        return 'generated'
+        filter_list = self.db.get_filters(self.job_id)
+
+        # data to insert in backlog table
+        items_query = []
+        filters_query = []
+        for filter_id in filter_list:
+            items_tolabel = self.db.get_items_tolabel_msr(self.job_id)['id'].unique()
+            items_tolabel_num = len(items_tolabel)
+
+            if items_tolabel_num == 0 or items_tolabel_num < self.size:
+                return 'error'
+            items_query += list(items_tolabel[:self.size])
+            filters_query += [filter_id]*self.size
+
+        if self.insert_items_filters_backlog(filters_query, items_query):
+            return 'generated'
+        else:
+            return 'error'
