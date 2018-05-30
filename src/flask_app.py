@@ -1,4 +1,5 @@
 import os
+import pandas as pd
 from flask import Flask
 from flask import request
 from flask import jsonify
@@ -109,7 +110,9 @@ def estimate_task_parameters():
     for filter_id in filter_list:
         # get data for filter_id
         data, workers_map, item_map = etp.get_thuthfinder_input(filter_id)
-        acc, p_out = etp.aggregate_data(data)
+        workers_num = len(workers_map)
+        items_num = len(item_map)
+        acc, p_out = etp.aggregate_data(workers_num, items_num, data)
         p_out_statistics_raw.append(p_out)
         filter_acc, filter_select = etp.estimate_filter_params(acc, p_out)
 
@@ -133,6 +136,6 @@ def estimate_task_parameters():
                                      for filter_pouts in p_out_statistics_raw]
 
     if etp.classify(item_filter_pout) == "classified":
-        return jsonify(response_payload)
+        return pd.Series(response_payload).to_json()
     else:
         abort(500, {"message": "error"})
