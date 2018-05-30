@@ -58,10 +58,3 @@ class EstimationTaskParams:
         filter_select = np.mean(p_out)
 
         return filter_acc, filter_select
-
-    def classify(self, item_filter_pout):
-        insert_items_filters = True
-        if insert_items_filters:
-            return 'classified'
-        else:
-            return 'error'

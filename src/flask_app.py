@@ -135,7 +135,4 @@ def estimate_task_parameters():
         item_filter_pout[item_id] = [filter_pouts[item_index]
                                      for filter_pouts in p_out_statistics_raw]
 
-    if etp.classify(item_filter_pout) == "classified":
-        return pd.Series(response_payload).to_json()
-    else:
-        abort(500, {"message": "error"})
+    return pd.Series(response_payload).to_json()
