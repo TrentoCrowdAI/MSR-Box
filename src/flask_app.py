@@ -9,6 +9,7 @@ from src.msr_box import TaskAssignmentMSR
 from src.msr_box import ClassificationMSR
 from src.msr_box import FilterAssignment
 from src.msr_box import FilterParameters
+from src.msr_box import Baseround
 from src.db import Database
 from src.baseround.estimation import EstimationTaskParams
 
@@ -136,3 +137,16 @@ def estimate_task_parameters():
                                      for filter_pouts in p_out_statistics_raw]
 
     return pd.Series(response_payload).to_json()
+
+
+@app.route('/msr/generate-baseround', methods=['POST'])
+def generate_baseround():
+    content = request.get_json()
+    job_id = int(content['jobId'])
+    size = content['size']
+    base = Baseround(db, job_id, size)
+
+    if base.generate_baseround() == 'generated':
+        return jsonify({"message": "generated"})
+    else:
+        abort(500, {"message": "error"})

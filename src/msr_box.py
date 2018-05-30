@@ -299,3 +299,14 @@ class FilterParameters:
                     'accuracy': self.filters_params_dict[str(filter_id)]['accuracy']
                 }
         return filter_params_new
+
+
+class Baseround:
+
+    def __init__(self, db, job_id, size):
+        self.db = db
+        self.job_id = job_id
+        self.size = size
+
+    def generate_baseround(self):
+        return 'generated'
