@@ -121,6 +121,18 @@ class Database:
         project_id = pd.read_sql(sql_project_id, self.con)['project_id'].values[0]
 
         return project_id
+    
+    def get_job(self, job_id):
+        '''
+        :param job_id:
+        :return: job
+        '''
+        sql_job = "select * from job where id = {job_id};".format(job_id=job_id)
+        rows = pd.read_sql(sql_job, self.con).to_dict(orient='records')
+        
+        if rows:
+          return rows[0]
+        return None
 
     def get_update_filter_data(self, job_id, project_id):
         '''

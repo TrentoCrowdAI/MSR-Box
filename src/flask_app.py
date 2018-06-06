@@ -89,7 +89,8 @@ def classify():
     out_threshold = content['outThreshold']
     in_threshold = content['inThreshold']
 
-    cl_msr = ClassificationMSR(db, job_id, filters_data, out_threshold, in_threshold)
+    cl_msr = ClassificationMSR(
+        db, job_id, filters_data, out_threshold, in_threshold)
     if cl_msr.classify() == "classified":
         response = {"message": "classified"}
         return jsonify(response)
@@ -104,7 +105,7 @@ def estimate_task_parameters():
     out_threshold = content['outThreshold']
 
     etp = EstimationTaskParams(db, job_id, out_threshold)
-    p_out_statistics_raw = []  #[[p_outs for filter1], [p_outs for filter2], ..]
+    p_out_statistics_raw = []  # [[p_outs for filter1], [p_outs for filter2], ..]
     response_payload = {'criteria': {}}
     workers_accuracy = {}
     filter_list = db.get_filters(job_id)
@@ -119,7 +120,8 @@ def estimate_task_parameters():
 
         # construct response payload
         # estimated accuracy of workers
-        worker_acc_pair_list = [(workers_map[key], acc[key]) for key in workers_map.keys()]
+        worker_acc_pair_list = [(workers_map[key], acc[key])
+                                for key in workers_map.keys()]
         workers_accuracy[filter_id] = []
         for worker_acc in worker_acc_pair_list:
             workers_accuracy[filter_id].append(dict([worker_acc]))
@@ -150,3 +152,19 @@ def generate_baseround():
         return jsonify({"message": "generated"})
     else:
         abort(500, {"message": "error"})
+
+
+@app.route('/msr/state', methods=['GET'])
+def get_state():
+    job_id = int(request.args.get('jobId'))
+    job = db.get_job(job_id)
+
+    if job == None:
+      abort(400, {"message": "The job does not exist"})
+
+    if 'shortestRun' in job['data'].keys():
+        return jsonify({
+            'state': job['data']['shortestRun']['state']
+        })
+    else:
+        abort(400, {"message": "The job does not have the shortestRun property"})
