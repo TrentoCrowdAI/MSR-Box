@@ -21,22 +21,36 @@ class TaskAssignmentMSR:
                 select max(step) from backlog where job_id = {job_id}
             );'''.format(job_id=self.job_id)
         filter_list = pd.read_sql(sql_filter_list, self.db.con)['criterion_id'].values
+        rows = pd.read_sql("select max(step) as step from backlog where job_id = {job_id};".format(job_id=self.job_id), self.db.con).to_dict(orient='records')
+        current_step = int(rows[0]['step'])
 
         # randomize the order of filters available
         np.random.shuffle(filter_list)
         filter_list = [int(i) for i in filter_list]
         for filter_id in filter_list:
-            sql_items_tolabel = '''
-                select b.item_id 
-                from backlog b 
-                where b.job_id = {job_id}
-                and b.criterion_id = {filter_id}
-                and b.step = (
-                    select max(step) from backlog where job_id = {job_id}
-                )
-                and compute_item_entries(b.job_id, b.item_id, b.criterion_id)
-                 < (select max(step)+1 from backlog where job_id = {job_id})
-            '''.format(job_id=self.job_id, filter_id=filter_id)
+            if current_step == 0:
+              sql_job = '''
+                select (data ->> 'votesPerTaskRule')::int as max_votes from job where id = {job_id}
+              '''.format(job_id=self.job_id)
+              rows = pd.read_sql(sql_job, self.db.con).to_dict(orient='records')
+              max_votes = rows[0]['max_votes']
+              sql_items_tolabel = '''
+                  select b.item_id 
+                  from backlog b 
+                  where b.job_id = {job_id}
+                  and b.criterion_id = {filter_id}
+                  and b.step = {current_step}
+                  and compute_item_entries(b.job_id, b.item_id, b.criterion_id) < {max_votes}
+              '''.format(job_id=self.job_id, filter_id=filter_id, current_step=current_step, max_votes=max_votes) 
+            else:
+              sql_items_tolabel = '''
+                  select b.item_id 
+                  from backlog b 
+                  where b.job_id = {job_id}
+                  and b.criterion_id = {filter_id}
+                  and b.step = {current_step}
+                  and compute_item_entries(b.job_id, b.item_id, b.criterion_id) < {current_step_plus}
+              '''.format(job_id=self.job_id, filter_id=filter_id,current_step=current_step, current_step_plus=current_step+1)
 
             items_tolabel = pd.read_sql(sql_items_tolabel, self.db.con)['item_id'].values
             items_tolabel = [int(i) for i in items_tolabel]

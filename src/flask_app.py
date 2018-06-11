@@ -20,17 +20,19 @@ DB = os.getenv('PGDATABASE') or 'crowdrev'
 HOST = os.getenv('PGHOST') or 'localhost'
 PORT = os.getenv('PGPORT') or 5432
 
-# connect to database
-db = Database(USER, PASSWORD, DB, HOST, PORT)
+db = None
+
+# connect to the database
+def setup_db():
+  global db
+  db = Database(USER, PASSWORD, DB, HOST, PORT)
 
 app = Flask(__name__)
+app.before_first_request(setup_db)
 
 
 @app.route('/msr/generate-tasks', methods=['POST'])
 def generate_tasks():
-    # TO DO: check if json is valid
-    # if not request.is_json:
-    #     abort(400)
     content = request.get_json()
     job_id = int(content['jobId'])
     stop_score = content['stopScore']
