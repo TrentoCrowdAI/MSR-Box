@@ -49,8 +49,8 @@ class TaskAssignmentMSR:
                   where b.job_id = {job_id}
                   and b.criterion_id = {filter_id}
                   and b.step = {current_step}
-                  and compute_item_entries(b.job_id, b.item_id, b.criterion_id) < {current_step_plus}
-              '''.format(job_id=self.job_id, filter_id=filter_id,current_step=current_step, current_step_plus=current_step+1)
+                  and compute_item_entries_step(b.job_id, b.item_id, b.criterion_id, {current_step}) < {current_step}
+              '''.format(job_id=self.job_id, filter_id=filter_id,current_step=current_step)
 
             items_tolabel = pd.read_sql(sql_items_tolabel, self.db.con)['item_id'].values
             items_tolabel = [int(i) for i in items_tolabel]
